@@ -1,0 +1,18 @@
+{
+    "leg_joints":
+    [
+    { "name":"COM"        ,    "id":-1,    "sister":-1,    "child":  1,    "mother2SelfVec": [     0,       0,        0],    "jointAxis": "UZ",   "jointRotation": 0},
+    { "name":"BASE_UZ"    ,    "id": 0,    "sister":-1,    "child":  2,    "mother2SelfVec": [     0,       0,  0.06124],    "jointAxis": "UZ",   "jointRotation": 0},
+    { "name":"SHOULDER_UY",    "id": 1,    "sister":-1,    "child":  3,    "mother2SelfVec": [     0,       0,  0.05410],    "jointAxis": "UX",   "jointRotation": 0},
+    { "name":"ELBOW_UY"   ,    "id": 2,    "sister":-1,    "child":  4,    "mother2SelfVec": [     0,       0,  0.16000],    "jointAxis": "UY",   "jointRotation": 0},
+    { "name":"WRIST_UY"   ,    "id": 3,    "sister":-1,    "child":  5,    "mother2SelfVec": [     0,       0,  0.09400],    "jointAxis": "UY",   "jointRotation": 0},
+    { "name":"WRIST_UX"   ,    "id": 4,    "sister":-1,    "child":  6,    "mother2SelfVec": [     0,       0,  0.02435],    "jointAxis": "UY",   "jointRotation": 0},
+    { "name":"GRIPPER"    ,    "id":-1,    "sister":-1,    "child": -1,    "mother2SelfVec": [     0,       0,  0.15500],    "jointAxis": "UX",   "jointRotation": 0}
+    ],
+    "inverted_motors_id": [],
+    "knee_ids": [],
+    "motor_type": {"AX-12":  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], 
+                   "MX-106": [],
+                   "MX-64":  []
+                  }
+}
