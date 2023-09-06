@@ -5,16 +5,21 @@ import rospy
 import numpy as np
 
 import sys, os
-edrom_dir = '/home/'+os.getlogin()+'/edromufu/src/'
+edrom_dir = '/home/'+os.getlogin()+'/hook/src/'
 
-sys.path.append(edrom_dir+'movement_bioloid/humanoid_definition/src')
+sys.path.append(edrom_dir+'movement/humanoid_definition/src')
 from setup_robot import Robot
 
-sys.path.append(edrom_dir+'movement_bioloid/movement_functions/src')
-from movement_patterns import Gait
+sys.path.append(edrom_dir+'movement/movement_functions/src')
+from movement_patterns import Gait #Não sei pq ta dando erro
 
-sys.path.append(edrom_dir+'movement_bioloid/movement_pages/src')
+
+#Comentando coisas relacionadas a pages
+'''
+sys.path.append(edrom_dir+'movement/movement_pages/src')
 from page_runner import Page
+'''
+
 
 from movement_utils.srv import *
 from movement_utils.msg import *
@@ -40,8 +45,11 @@ class Core:
 
         #Services de requisição de movimento, todos possuem como callback movementManager
         rospy.Service('movement_central/request_gait', gait, self.movementManager)
-        rospy.Service('movement_central/request_page', page, self.movementManager)
-        
+
+        #comentarios em cima das pages
+        """
+        #rospy.Service('movement_central/request_page', page, self.movementManager)
+        """
         #Estruturas para comunicação com U2D2
         self.motorsFeedback = rospy.ServiceProxy('u2d2_comm/feedbackBody', body_feedback)
         self.pub2motors = rospy.Publisher('u2d2_comm/data2body', body_motors_data, queue_size=100)
@@ -56,9 +64,8 @@ class Core:
             self.queuevis = []
             self.pub2vis = rospy.Publisher('/joint_states', JointState, queue_size=100)
             self.pub2vismsg = JointState()
-            self.pub2vismsg.name = ['RHIP_UZ_joint','RHIP_UX_joint','RHIP_UY_joint','RKNEE_joint',
-            'RANKLE_UY_joint','RANKLE_UX_joint','LHIP_UZ_joint','LHIP_UX_joint','LHIP_UY_joint',
-            'LKNEE_joint','LANKLE_UY_joint','LANKLE_UX_joint']
+            self.pub2vismsg.name = ['BASE_UZ', 'SHOULDER_UY', 'ELBOW_UY', 
+                                    'WRIST_UY', 'WRIST_UX', 'GRIPPER']
 
     def callRobotModelUpdate(self):
         self.motorsCurrentPosition = list(self.motorsFeedback(True).pos_vector)
@@ -129,7 +136,9 @@ class Core:
 
             response = gaitResponse()
             response.success = True
-        
+
+        #Comentar tudo relacionado a pages?
+        '''''
         elif 'page' in str(req.__class__):
             page_poses = Page(req.page_name, QUEUE_TIME)
             
@@ -147,7 +156,7 @@ class Core:
             response.success = True
         
         return response
-    
+        '''
     def sendFromQueue(self, event):
 
         if self.queue:

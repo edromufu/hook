@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+#Parece que ta tudo errado por aqui
+
 import os, json
 import rospy
 from dynamixel_sdk import *
@@ -50,7 +52,7 @@ class u2d2Control():
         self.startComm()
         
     def loadMotorsType(self):
-        os.chdir('/home/'+os.getlogin()+'/edromufu/src/movement_bioloid/humanoid_definition/robots_jsons/')
+        os.chdir('/home/'+os.getlogin()+'/hook/src/movement/humanoid_definition/robots_jsons/')
 
         with open(ROBOT_MOTORS+'.json') as f:
             json_data = json.loads(f.read())

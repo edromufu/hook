@@ -2,6 +2,8 @@
 import dynamixel_sdk as dxl
 import time
 
+#Ver pq não ta funcionando
+
 # Parâmetros da comunicação com os motores Dynamixel
 BAUDRATE = 1000000  # Velocidade de comunicação
 DEVICENAME = '/dev/ttyUSB0'  # Porta serial a ser utilizada

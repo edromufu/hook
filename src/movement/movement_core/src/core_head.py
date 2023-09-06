@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 #coding=utf-8
 
+#Tirar esse cod inteiro?
+
+
 import numpy as np
 
 import rospy
-from vision_msgs.msg import Webotsmsg
+from vision_msgs.msg import Webotsmsg #arrumar aqui?
 from movement_utils.srv import *
 from movement_utils.msg import *
 
