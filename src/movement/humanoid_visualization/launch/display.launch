@@ -1,5 +1,5 @@
 <launch>
-  <arg name="gui" default="true" />
+  <arg name="gui" default="false" />
   <arg name="robot_name" default="hook"/>
   <arg name="model" default="$(find humanoid_visualization)/urdf/$(arg robot_name).urdf"/>
   <arg name="rvizconfig" default="$(find humanoid_visualization)/urdf/hook.rviz" />
@@ -10,6 +10,5 @@
   <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="true" />
 
   <node if="$(arg gui)" name="joint_state_publisher" pkg="joint_state_publisher_gui" type="joint_state_publisher_gui" />
-  <node unless="$(arg gui)" name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" />
 
 </launch>

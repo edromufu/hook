@@ -5,16 +5,11 @@ import rospy
 import numpy as np
 
 import sys, os
-edrom_dir = '/home/'+os.getlogin()+'/edromufu/src/'
+hook_dir = '/home/'+os.getlogin()+'/hook/src/'
 
-sys.path.append(edrom_dir+'movement_bioloid/humanoid_definition/src')
+sys.path.append(hook_dir+'movement/humanoid_definition/src')
 from setup_robot import Robot
 
-sys.path.append(edrom_dir+'movement_bioloid/movement_functions/src')
-from movement_patterns import Gait
-
-sys.path.append(edrom_dir+'movement_bioloid/movement_pages/src')
-from page_runner import Page
 
 from movement_utils.srv import *
 from movement_utils.msg import *
@@ -25,139 +20,82 @@ PUB2VIS = rospy.get_param('/movement_core/pub2vis')
 
 class Core:
     def __init__(self): 
-
-        rospy.wait_for_service('u2d2_comm/feedbackBody')
         
+        # Inicialização das variáveis do ROS
+        rospy.init_node('movement_central')
+
+        # Inicialização das variáveis do ROS para u2d2
+        if rospy.get_param('/movement_core/wait4u2d2'):
+            rospy.wait_for_service('u2d2_comm/feedbackAllArm')
+            rospy.wait_for_service('u2d2_comm/enableTorque')
+
+            #Estruturas para comunicação com U2D2
+            self.motorsFeedback = rospy.ServiceProxy('u2d2_comm/feedbackAllArm', arm_feedback)
+
+            self.pub2arm = rospy.Publisher('u2d2_comm/data2arm', arm_motors_data, queue_size=100)
+            self.pub2armMsg = arm_motors_data()
+
+            self.pub2gripper = rospy.Publisher('u2d2_comm/data2gripper', gripper_motor_data, queue_size=100)
+            self.pub2gripperMsg = gripper_motor_data()
+
+            self.queue = []  
+
+        # Inicialização das variáveis do ROS de requisição na core
+        rospy.Service('movement_central/request_base_rotation', base_rotation, self.movementManager)
+
         #Inicialização do objeto (modelo) da robô em código
         robot_name = rospy.get_param('/movement_core/name')
                 
         self.robotInstance = Robot(robot_name)
         self.robotModel = self.robotInstance.robotJoints
-        self.motorId2JsonIndex = self.robotInstance.motorId2JsonIndex
-        
-        # Inicialização das variáveis do ROS
-        rospy.init_node('movement_central')
-
-        #Services de requisição de movimento, todos possuem como callback movementManager
-        rospy.Service('movement_central/request_gait', gait, self.movementManager)
-        rospy.Service('movement_central/request_page', page, self.movementManager)
-        
-        #Estruturas para comunicação com U2D2
-        self.motorsFeedback = rospy.ServiceProxy('u2d2_comm/feedbackBody', body_feedback)
-        self.pub2motors = rospy.Publisher('u2d2_comm/data2body', body_motors_data, queue_size=100)
-        self.pub2motorsMsg = body_motors_data()
-
-        #Timer para fila de publicações
-        rospy.Timer(rospy.Duration(QUEUE_TIME), self.sendFromQueue)
-        self.queue = []
 
         # Definições para visualizador
         if PUB2VIS:
             self.queuevis = []
             self.pub2vis = rospy.Publisher('/joint_states', JointState, queue_size=100)
             self.pub2vismsg = JointState()
-            self.pub2vismsg.name = ['RHIP_UZ_joint','RHIP_UX_joint','RHIP_UY_joint','RKNEE_joint',
-            'RANKLE_UY_joint','RANKLE_UX_joint','LHIP_UZ_joint','LHIP_UX_joint','LHIP_UY_joint',
-            'LKNEE_joint','LANKLE_UY_joint','LANKLE_UX_joint']
+            self.pub2vismsg.name = ['BASE_UZ_joint', 'SHOULDER_UY_joint', 'ELBOW_UY_joint', 
+                                    'WRIST_UY_joint', 'WRIST_UZ_joint']
 
-    def callRobotModelUpdate(self):
-        self.motorsCurrentPosition = list(self.motorsFeedback(True).pos_vector)
+        #Timer para fila de publicações
+        rospy.Timer(rospy.Duration(QUEUE_TIME), self.sendFromQueue)
 
-        positions2Update = self.motorsCurrentPosition
-        
-        positions2Update = self.sortMotorReturn2JsonIndex(positions2Update)
-
-        positions2Update  = self.invertMotorsPosition(positions2Update)
-
-        self.robotInstance.updateRobotModel(positions2Update)
-
-    def sortMotorReturn2JsonIndex(self, toSort):
-
-        sorted2JsonIndexPositions = [0]*len(self.robotModel)
-        for motor_id, motor_position in enumerate(toSort):
-            if motor_id in self.motorId2JsonIndex.keys():
-                jsonIndex = self.motorId2JsonIndex[motor_id]
-                sorted2JsonIndexPositions[jsonIndex] = motor_position
-        
-        return sorted2JsonIndexPositions
-    
-    def sortJsonIndex2MotorInput(self, toSort):
-        
-        sorted2MotorsId = self.motorsCurrentPosition
-
-        for json_id, position in enumerate(toSort):
-            if json_id in self.motorId2JsonIndex.values():
-                motor_id = self.keyFromValue(self.motorId2JsonIndex, json_id)
-                sorted2MotorsId[motor_id] = position
-        
-        return sorted2MotorsId
-
-    def keyFromValue(self, dict, value):
-        for key, v in dict.items():
-            if v == value:
-                return key
-        return None
-    
-    def invertMotorsPosition(self, toInvert):
-        for jsonIndex, joint in enumerate(self.robotModel):
-            if joint.is_inverted():
-                toInvert[jsonIndex] *= -1
-        
-        return toInvert
+        #! TESTE - EXCLUIR POSTERIORMENTE
+        self.motorRotation = [0]*6
 
     def movementManager(self, req):
         
-        self.callRobotModelUpdate()
+        if 'base_rotation' in str(req.__class__):
 
-        if 'gait' in str(req.__class__):
+            self.motorRotation[0] += req.base_rotation_increment
 
-            checked_poses = self.motorsCurrentPosition
-            gait_poses = Gait(self.robotModel, req.step_height, req.steps_number)
-            
-            for index, pose in enumerate(gait_poses):
-                pose = self.invertMotorsPosition(pose)
-                pose = self.sortJsonIndex2MotorInput(pose)
-                checked_poses = np.append(checked_poses, [pose], axis=0)  
-
-            for pose in checked_poses: 
-                self.queue.append(pose)
+            if rospy.get_param('/movement_core/wait4u2d2'):
+                self.queue.append(self.motorRotation)
 
             if PUB2VIS:
-                for pose in gait_poses:
-                    pose = self.invertMotorsPosition(pose)
-                    self.queuevis.append(pose[1:-2])
+                self.queuevis.append(self.motorRotation[:-1])
 
-            response = gaitResponse()
+            response = base_rotationResponse()
             response.success = True
-        
-        elif 'page' in str(req.__class__):
-            page_poses = Page(req.page_name, QUEUE_TIME)
-            
-            for pose in page_poses: 
-                self.queue.append(pose)
-            
-            if PUB2VIS:
-                for pose in page_poses:
-                    pose = self.sortMotorReturn2JsonIndex(pose)
-                    pose = self.invertMotorsPosition(pose)
 
-                    self.queuevis.append(pose[1:-2])
-
-            response = pageResponse()
-            response.success = True
+        return response 
         
-        return response
-    
     def sendFromQueue(self, event):
+        
+        if rospy.get_param('/movement_core/wait4u2d2'):
+            if self.queue:
+                current_all_arm_pose = self.queue.pop(0)
+                self.pub2armMsg.pos_vector = current_all_arm_pose[:-1]
+                self.pub2arm.publish(self.pub2armMsg)
 
-        if self.queue:
-            self.pub2motorsMsg.pos_vector = self.queue.pop(0)
-            self.pub2motors.publish(self.pub2motorsMsg)
+                self.pub2gripperMsg.pos_vector = current_all_arm_pose[-1]
+                self.pub2gripper.publish(self.pub2gripperMsg)
 
-        if self.queuevis and PUB2VIS:
-            self.pub2vismsg.position = self.queuevis.pop(0)
-            self.pub2vismsg.header.stamp = rospy.Time.now()
-            self.pub2vis.publish(self.pub2vismsg)
+        if PUB2VIS:
+            if self.queuevis:
+                self.pub2vismsg.position = self.queuevis.pop(0)
+                self.pub2vismsg.header.stamp = rospy.Time.now()
+                self.pub2vis.publish(self.pub2vismsg)
 
 
 if __name__ == '__main__':

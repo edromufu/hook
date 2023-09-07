@@ -10,7 +10,7 @@ jointAxisPredef = {'UX':np.array([[1, 0, 0]]).T,
 
 class Joint:
 
-    def __init__(self, name, motor_id, sister, child, mother2SelfVec, jointAxis, jointRotation, is_inverted, is_knee):
+    def __init__(self, name, motor_id, sister, child, mother2SelfVec, jointAxis, jointRotation, is_inverted, is_limited):
 
         self.__name = name
         self.__sister = sister
@@ -19,7 +19,7 @@ class Joint:
         self.__jointAxis = jointAxisPredef[jointAxis]
         self.__motor_id = motor_id
         self.__is_inverted = is_inverted
-        self.__is_knee = is_knee
+        self.__is_limited = is_limited
         self.__mom = None
 
         self.jointRotation = jointRotation
@@ -47,8 +47,8 @@ class Joint:
     def get_id(self):
         return self.__motor_id
     
-    def is_knee(self):
-        return self.__is_knee
+    def is_limited(self):
+        return self.__is_limited
     
     def is_inverted(self):
         return self.__is_inverted

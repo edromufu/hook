@@ -22,18 +22,16 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
-  head_motors_data.msg
-  body_motors_data.msg
+  arm_motors_data.msg
+  gripper_motor_data.msg
   )
 
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
   enable_torque.srv
-  body_feedback.srv
-  head_feedback.srv
-  gait.srv
-  page.srv
+  arm_feedback.srv
+  base_rotation.srv
 )
 
 ## Generate actions in the 'action' folder
