@@ -4,6 +4,7 @@
     <arg name="robot_name" default="hook"/>
     <arg name="queue_time" default="0.2"/>
     <arg name="visualization" default="true"/>
+    <arg name="control_rviz" default="false"/>
 
     <!-- Inicialização do movimento de -->
     <node name="movement_core" pkg="movement_core" type="core.py" output="screen">
@@ -22,6 +23,7 @@
     <include file="$(find humanoid_visualization)/launch/display.launch" if="$(eval arg('visualization'))">
         <arg name="model" value="$(find humanoid_visualization)/urdf/$(arg robot_name).urdf" />
         <arg name="rvizconfig" value="$(find humanoid_visualization)/urdf/movement.rviz" />
+        <arg name="gui" value="$(arg control_rviz)" />
     </include>
 
 </launch>
