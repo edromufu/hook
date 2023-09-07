@@ -4,9 +4,8 @@
 import json, os, sys
 import numpy as np
 
-import sys, os
-edrom_dir = '/home/'+os.getlogin()+'/hook/src/'
-sys.path.append(edrom_dir+'movement/kinematic_functions/src')
+hook_dir = '/home/'+os.getlogin()+'/hook/src/'
+sys.path.append(hook_dir+'movement/kinematic_functions/src')
 from ik_numerical import ForwardKinematics
 
 from joint import Joint
@@ -21,15 +20,6 @@ class Robot:
         self.robotJoints[0].absolutePosture = np.identity(3)
 
         ForwardKinematics(self.robotJoints)
-        
-        self.motorId2JsonIndex = {}
-        self.mapMotorId2Json()
-    
-    def mapMotorId2Json(self):
-        for jsonIndex, joint in enumerate(self.robotJoints):
-            motor_id = joint.get_id()
-            if motor_id != -1:
-                self.motorId2JsonIndex[motor_id] = jsonIndex
     
     def updateRobotModel(self, jointsRotation):
 
@@ -43,20 +33,16 @@ class Robot:
         
         self.robotJoints = []
 
-
-
-        #Mudar estre trecho talvez?
-
         for joint_data in self.json_data['leg_joints']:
             is_inverted = False
-            is_knee = False
+            is_limited = False
             if joint_data['id'] in self.json_data['inverted_motors_id']:
                 is_inverted = True
             
-            if joint_data['id'] in self.json_data['knee_ids']:
-                is_knee = True
+            if joint_data['id'] in self.json_data['limit_these_motors_position']:
+                is_limited = True
 
-            self.robotJoints.append(Joint(*joint_data.values(),is_inverted, is_knee))
+            self.robotJoints.append(Joint(*joint_data.values(),is_inverted, is_limited))
 
     def loadJson(self, fileName):
         os.chdir('/home/'+os.getlogin()+'/hook/src/movement/humanoid_definition/robots_jsons/')

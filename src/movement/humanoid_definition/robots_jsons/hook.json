@@ -10,5 +10,5 @@
     { "name":"GRIPPER"    ,    "id":-1,    "sister":-1,    "child": -1,    "mother2SelfVec": [     0,       0,  0.15500],    "jointAxis": "UX",   "jointRotation": 0}
     ],
     "inverted_motors_id": [],
-    "knee_ids": []
+    "limit_these_motors_position": []
 }

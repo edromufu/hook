@@ -31,8 +31,7 @@ add_service_files(
   FILES
   enable_torque.srv
   arm_feedback.srv
-  gait.srv
-  page.srv
+  base_rotation.srv
 )
 
 ## Generate actions in the 'action' folder

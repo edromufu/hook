@@ -1,0 +1,44 @@
+def callRobotModelUpdate(self):
+    self.motorsCurrentPosition = list(self.motorsFeedback(True).pos_vector)
+
+    positions2Update = self.motorsCurrentPosition
+    
+    positions2Update = self.sortMotorReturn2JsonIndex(positions2Update)
+
+    positions2Update  = self.invertMotorsPosition(positions2Update)
+
+    self.robotInstance.updateRobotModel(positions2Update)
+
+def sortMotorReturn2JsonIndex(self, toSort):
+
+    sorted2JsonIndexPositions = [0]*len(self.robotModel)
+    for motor_id, motor_position in enumerate(toSort):
+        if motor_id in self.motorId2JsonIndex.keys():
+            jsonIndex = self.motorId2JsonIndex[motor_id]
+            sorted2JsonIndexPositions[jsonIndex] = motor_position
+    
+    return sorted2JsonIndexPositions
+
+def sortJsonIndex2MotorInput(self, toSort):
+    
+    sorted2MotorsId = self.motorsCurrentPosition
+
+    for json_id, position in enumerate(toSort):
+        if json_id in self.motorId2JsonIndex.values():
+            motor_id = self.keyFromValue(self.motorId2JsonIndex, json_id)
+            sorted2MotorsId[motor_id] = position
+    
+    return sorted2MotorsId
+
+def keyFromValue(self, dict, value):
+    for key, v in dict.items():
+        if v == value:
+            return key
+    return None
+
+def invertMotorsPosition(self, toInvert):
+    for jsonIndex, joint in enumerate(self.robotModel):
+        if joint.is_inverted():
+            toInvert[jsonIndex] *= -1
+    
+    return toInvert
