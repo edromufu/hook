@@ -31,6 +31,7 @@ class Core:
 
             #Estruturas para comunicação com U2D2
             self.motorsFeedback = rospy.ServiceProxy('u2d2_comm/feedbackAllArm', arm_feedback)
+            self.enableTorque = rospy.ServiceProxy('u2d2_comm/enableTorque', enable_torque)
 
             self.pub2arm = rospy.Publisher('u2d2_comm/data2arm', arm_motors_data, queue_size=100)
             self.pub2armMsg = arm_motors_data()
@@ -42,12 +43,16 @@ class Core:
 
         # Inicialização das variáveis do ROS de requisição na core
         rospy.Service('movement_central/request_base_rotation', base_rotation, self.movementManager)
+        rospy.Service('movement_central/request_gripper_gap', gripper_gap, self.movementManager)
 
         #Inicialização do objeto (modelo) da robô em código
         robot_name = rospy.get_param('/movement_core/name')
                 
         self.robotInstance = Robot(robot_name)
         self.robotModel = self.robotInstance.robotJoints
+        self.lastRequest = None
+        self.lastIncrement = 0
+        self.motorsPosition = [0]*6
 
         # Definições para visualizador
         if PUB2VIS:
@@ -60,23 +65,85 @@ class Core:
         #Timer para fila de publicações
         rospy.Timer(rospy.Duration(QUEUE_TIME), self.sendFromQueue)
 
-        #! TESTE - EXCLUIR POSTERIORMENTE
-        self.motorRotation = [0]*6
+        self.enableTorque(True, [-1])
+        self.callRobotModelUpdate()
+
+    def callRobotModelUpdate(self):
+        self.motorsCurrentPosition = list(self.motorsFeedback(True).pos_vector)
+        
+        positions2Update = []
+        for element in self.motorsCurrentPosition:
+            positions2Update.append(element)
+
+        positions2Update = self.invertMotorsPosition(positions2Update)
+        
+        self.robotInstance.updateRobotModel([0] + positions2Update[1:4] + [0])
+    
+    def invertMotorsPosition(self, toInvert):
+        for index, joint in enumerate(self.robotModel):
+            if joint.is_inverted():
+                toInvert[joint.get_id()] *= -1
+        
+        return toInvert
 
     def movementManager(self, req):
         
-        if 'base_rotation' in str(req.__class__):
+        self.callRobotModelUpdate()
 
-            self.motorRotation[0] += req.base_rotation_increment
+        if 'base_rotation' in str(req.__class__):
+            
+            if self.lastRequest != 'base_rotation':
+
+                currentPosition = []
+                for index, lastPosition in enumerate(self.motorsPosition):
+                    if abs(lastPosition-self.motorsCurrentPosition[index]) >= self.lastIncrement:
+                        currentPosition.append(self.motorsCurrentPosition[index])
+                    else:
+                        currentPosition.append(lastPosition)
+                
+                self.motorsPosition = currentPosition
+
+            baseUzNewPosition = req.base_rotation_increment + self.motorsCurrentPosition[0]
+            allMotorsNewPosition = [baseUzNewPosition] + self.motorsPosition[1:]
 
             if rospy.get_param('/movement_core/wait4u2d2'):
-                self.queue.append(self.motorRotation)
+                self.queue.append(allMotorsNewPosition)
 
             if PUB2VIS:
-                self.queuevis.append(self.motorRotation[:-1])
+                self.queuevis.append(all1MotorsNewPosition)
 
             response = base_rotationResponse()
             response.success = True
+
+            self.lastRequest = 'base_rotation'
+            self.lastIncrement = req.base_rotation_increment 
+
+        elif 'gripper_gap' in str(req.__class__):
+            
+            if self.lastRequest != 'gripper_gap':
+                currentPosition = []
+                for index, lastPosition in enumerate(self.motorsPosition):
+                    if abs(lastPosition-self.motorsCurrentPosition[index]) >= self.lastIncrement:
+                        currentPosition.append(self.motorsCurrentPosition[index])
+                    else:
+                        currentPosition.append(lastPosition)
+                
+                self.motorsPosition = currentPosition
+
+            gripperNewPosition = req.gripper_gap_increment + self.motorsCurrentPosition[-1]
+            allMotorsNewPosition = self.motorsPosition[:-1] + [gripperNewPosition] 
+
+            if rospy.get_param('/movement_core/wait4u2d2'):
+                self.queue.append(allMotorsNewPosition)
+
+            if PUB2VIS:
+                self.queuevis.append(allMotorsNewPosition)
+
+            response = gripper_gapResponse()
+            response.success = True
+
+            self.lastRequest = 'gripper_gap'
+            self.lastIncrement = req.gripper_gap_increment
 
         return response 
         
@@ -88,7 +155,7 @@ class Core:
                 self.pub2armMsg.pos_vector = current_all_arm_pose[:-1]
                 self.pub2arm.publish(self.pub2armMsg)
 
-                self.pub2gripperMsg.pos_vector = current_all_arm_pose[-1]
+                self.pub2gripperMsg.gripper_position = current_all_arm_pose[-1]
                 self.pub2gripper.publish(self.pub2gripperMsg)
 
         if PUB2VIS:

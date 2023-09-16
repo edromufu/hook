@@ -85,7 +85,7 @@ class u2d2Control():
             return self.feedbackRes
 
         except:
-            return self.feedbackBodyMotors(req)
+            return self.feedbackArmMotors(req)
 
     def data2arm(self, msg):
 
@@ -97,15 +97,15 @@ class u2d2Control():
             value = self.rad2pos(motor_position)
             bytes_value = value.to_bytes(2, byteorder='little')
 
-            self.bodyGroup.addParam(motor_id, bytes_value)
+            self.armGroup.addParam(motor_id, bytes_value)
 
-        self.bodyGroup.txPacket()
+        self.armGroup.txPacket()
 
     def data2gripper(self, msg):
         
         self.gripperGroup.clearParam()
 
-        motor_position = gripper_position
+        motor_position = msg.gripper_position
 
         value = self.rad2pos(motor_position)
         bytes_value = value.to_bytes(2, byteorder='little')
