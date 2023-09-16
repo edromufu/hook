@@ -13,10 +13,13 @@ from setup_robot import Robot
 
 from movement_utils.srv import *
 from movement_utils.msg import *
+from std_srvs.srv import *
 from sensor_msgs.msg import JointState
 
 QUEUE_TIME = rospy.get_param('/movement_core/queue_time') #Em segundos
 PUB2VIS = rospy.get_param('/movement_core/pub2vis')
+L = 0.024
+r = 0.014
 
 class Core:
     def __init__(self): 
@@ -44,6 +47,8 @@ class Core:
         # Inicialização das variáveis do ROS de requisição na core
         rospy.Service('movement_central/request_base_rotation', base_rotation, self.movementManager)
         rospy.Service('movement_central/request_gripper_gap', gripper_gap, self.movementManager)
+        rospy.Service('movement_central/request_endeffector_kinematics', kinematic_request, self.movementManager)
+        rospy.Service('movement_central/request_first_pose', SetBool, self.movementManager)
 
         #Inicialização do objeto (modelo) da robô em código
         robot_name = rospy.get_param('/movement_core/name')
@@ -60,7 +65,8 @@ class Core:
             self.pub2vis = rospy.Publisher('/joint_states', JointState, queue_size=100)
             self.pub2vismsg = JointState()
             self.pub2vismsg.name = ['BASE_UZ_joint', 'SHOULDER_UY_joint', 'ELBOW_UY_joint', 
-                                    'WRIST_UY_joint', 'WRIST_UZ_joint']
+                                    'WRIST_UY_joint', 'WRIST_UZ_joint', 
+                                    'LEFT_GRIPPER_FINGER_joint', 'RIGHT_GRIPPER_FINGER_joint']
 
         #Timer para fila de publicações
         rospy.Timer(rospy.Duration(QUEUE_TIME), self.sendFromQueue)
@@ -110,7 +116,16 @@ class Core:
                 self.queue.append(allMotorsNewPosition)
 
             if PUB2VIS:
-                self.queuevis.append(all1MotorsNewPosition)
+                a = 1
+                b = -2*r*np.cos(allMotorsNewPosition[-1])
+                c = r**2 - L**2
+
+                delta = b**2 - 4*a*c
+
+                angle2slide = (-b+np.sqrt(delta))/(2*a)
+
+                pub2VisPos = allMotorsNewPosition[:-1] + [angle2slide,angle2slide]
+                self.queuevis.append(pub2VisPos)
 
             response = base_rotationResponse()
             response.success = True
@@ -137,13 +152,48 @@ class Core:
                 self.queue.append(allMotorsNewPosition)
 
             if PUB2VIS:
-                self.queuevis.append(allMotorsNewPosition)
+                a = 1
+                b = -2*r*np.cos(allMotorsNewPosition[-1])
+                c = r**2 - L**2
+
+                delta = b**2 - 4*a*c
+
+                angle2slide = (-b+np.sqrt(delta))/(2*a)
+
+                pub2VisPos = allMotorsNewPosition[:-1] + [angle2slide,angle2slide]
+                self.queuevis.append(pub2VisPos)
 
             response = gripper_gapResponse()
             response.success = True
 
             self.lastRequest = 'gripper_gap'
             self.lastIncrement = req.gripper_gap_increment
+        
+        elif 'SetBool' in str(req.__class__):
+            self.motorsPosition = [0, -0.8, -2, -1, 0, 0]
+
+            allMotorsNewPosition = self.motorsPosition
+
+            if rospy.get_param('/movement_core/wait4u2d2'):
+                self.queue.append(allMotorsNewPosition)
+
+            if PUB2VIS:
+                a = 1
+                b = -2*r*np.cos(allMotorsNewPosition[-1])
+                c = r**2 - L**2
+
+                delta = b**2 - 4*a*c
+
+                angle2slide = (-b+np.sqrt(delta))/(2*a)
+
+                pub2VisPos = allMotorsNewPosition[:-1] + [angle2slide,angle2slide]
+                self.queuevis.append(pub2VisPos)
+            
+            response = SetBoolResponse()
+            response.success = True
+
+            self.lastRequest = 'SetBool'
+            self.lastIncrement = 0
 
         return response 
         

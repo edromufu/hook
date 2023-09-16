@@ -33,6 +33,7 @@ add_service_files(
   arm_feedback.srv
   base_rotation.srv
   gripper_gap.srv
+  kinematic_request.srv
 )
 
 ## Generate actions in the 'action' folder

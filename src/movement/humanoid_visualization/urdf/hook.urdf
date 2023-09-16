@@ -120,7 +120,7 @@
   </link>
 
   <joint name="SHOULDER_UY_joint" type="revolute">
-    <axis xyz="0 1 0"/>
+    <axis xyz="0 -1 0"/>
 		<limit effort="1000.0" lower="-3.14" upper="3.14" velocity="10"/>
     <origin rpy="0 0 0" xyz="0 0 0.05410"/>
     <parent link="BASE_UZ"/>
@@ -176,25 +176,45 @@
   <joint name="WRIST_UZ_joint" type="revolute">
     <axis xyz="0 0 1"/>
 		<limit effort="1000.0" lower="-3.14" upper="3.14" velocity="10"/>
-    <origin rpy="0 0 0" xyz="0 0 0.02435"/>
+    <origin rpy="0 0 0" xyz="0 0 0.0205"/>
     <parent link="WRIST_UY"/>
     <child link="WRIST_UZ"/>
   </joint>
 
-	<link name="GRIPPER">
+  <link name="LEFT_GRIPPER_FINGER">
     <visual>
       <geometry>
-				<box size="0.097 0.049 0.0678"/>
+				<box size="0.02 0.01 0.0678"/>
 			</geometry>
-      <origin rpy="0 0 0" xyz="0 0 0.0339"/>
+      <origin rpy="0 0 0" xyz="0 0.005 0.0339"/>
       <material name="black"/>
     </visual>
   </link>
 
-  <joint name="GRIPPER_UX_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0"/>
+  <joint name="LEFT_GRIPPER_FINGER_joint" type="prismatic">
+    <axis xyz="0 1 0"/>
+		<limit effort="1000.0" lower="0" upper="0.028" velocity="10"/>
+    <origin rpy="0 0 0" xyz="0 0 0.093"/>
     <parent link="WRIST_UZ"/>
-    <child link="GRIPPER"/>
+    <child link="LEFT_GRIPPER_FINGER"/>
+  </joint>
+
+  <link name="RIGHT_GRIPPER_FINGER">
+    <visual>
+      <geometry>
+				<box size="0.02 0.01 0.0678"/>
+			</geometry>
+      <origin rpy="0 0 0" xyz="0 -0.005 0.0339"/>
+      <material name="black"/>
+    </visual>
+  </link>
+
+  <joint name="RIGHT_GRIPPER_FINGER_joint" type="prismatic">
+    <axis xyz="0 -1 0"/>
+		<limit effort="1000.0" lower="0" upper="0.028" velocity="10"/>
+    <origin rpy="0 0 0" xyz="0 0 0.093"/>
+    <parent link="WRIST_UZ"/>
+    <child link="RIGHT_GRIPPER_FINGER"/>
   </joint>
 
 </robot>
