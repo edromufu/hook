@@ -24,6 +24,9 @@ add_message_files(
   FILES
   arm_motors_data.msg
   gripper_motor_data.msg
+  base_rotation.msg
+  gripper_gap.msg
+  kinematic_request.msg
   )
 
 ## Generate services in the 'srv' folder
@@ -31,9 +34,6 @@ add_service_files(
   FILES
   enable_torque.srv
   arm_feedback.srv
-  base_rotation.srv
-  gripper_gap.srv
-  kinematic_request.srv
 )
 
 ## Generate actions in the 'action' folder

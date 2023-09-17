@@ -1,0 +1,1 @@
+float32 base_rotation_increment

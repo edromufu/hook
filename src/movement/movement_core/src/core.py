@@ -13,13 +13,15 @@ from setup_robot import Robot
 
 from movement_utils.srv import *
 from movement_utils.msg import *
-from std_srvs.srv import *
+from std_msgs.msg import Bool
 from sensor_msgs.msg import JointState
 
 QUEUE_TIME = rospy.get_param('/movement_core/queue_time') #Em segundos
 PUB2VIS = rospy.get_param('/movement_core/pub2vis')
-L = 0.024
-r = 0.014
+
+#Constantes relacionadas à transmissão da rotação do motor do gripper para sua translação
+L = 0.024 #Tamanho da manivela (m)
+r = 0.014 #Raio do motor (m)
 
 class Core:
     def __init__(self): 
@@ -45,10 +47,10 @@ class Core:
             self.queue = []  
 
         # Inicialização das variáveis do ROS de requisição na core
-        rospy.Service('movement_central/request_base_rotation', base_rotation, self.movementManager)
-        rospy.Service('movement_central/request_gripper_gap', gripper_gap, self.movementManager)
-        rospy.Service('movement_central/request_endeffector_kinematics', kinematic_request, self.movementManager)
-        rospy.Service('movement_central/request_first_pose', SetBool, self.movementManager)
+        rospy.Subscriber('movement_central/request_base_rotation', base_rotation, self.movementManager)
+        rospy.Subscriber('movement_central/request_gripper_gap', gripper_gap, self.movementManager)
+        rospy.Subscriber('movement_central/request_endeffector_kinematics', kinematic_request, self.movementManager)
+        rospy.Subscriber('movement_central/request_first_pose', Bool, self.movementManager)
 
         #Inicialização do objeto (modelo) da robô em código
         robot_name = rospy.get_param('/movement_core/name')
@@ -92,84 +94,83 @@ class Core:
         
         return toInvert
 
-    def movementManager(self, req):
+    def updateCurrentMotorsPosition(self):
+        currentPosition = []
+
+        for index, lastPosition in enumerate(self.motorsPosition):
+                if abs(lastPosition-self.motorsCurrentPosition[index]) >= self.lastIncrement:
+                    currentPosition.append(self.motorsCurrentPosition[index])
+                else:
+                    currentPosition.append(lastPosition)
+        
+        return currentPosition
+
+    def baseIncrementAlgorithm(self, base_increment):
+        baseUzNewPosition = base_increment + self.motorsCurrentPosition[0]
+
+        return [baseUzNewPosition] + self.motorsPosition[1:]
+    
+    def gripperGapAlgorithm(self, gripper_increment):
+
+        gripperNewPosition = gripper_increment + self.motorsCurrentPosition[-1]
+
+        return self.motorsPosition[:-1] + [gripperNewPosition] 
+
+    def getSlideFromAngle(self, theta):
+        b = -2*r*np.cos(theta)
+        c = r**2 - L**2
+
+        delta = b**2 - 4*c
+        
+        return (-b+np.sqrt(delta))/2
+
+    def movementManager(self, msg):
         
         self.callRobotModelUpdate()
+        self.enableTorque(True, [-1])
 
-        if 'base_rotation' in str(req.__class__):
+        if 'base_rotation' in str(msg.__class__):
             
             if self.lastRequest != 'base_rotation':
-
-                currentPosition = []
-                for index, lastPosition in enumerate(self.motorsPosition):
-                    if abs(lastPosition-self.motorsCurrentPosition[index]) >= self.lastIncrement:
-                        currentPosition.append(self.motorsCurrentPosition[index])
-                    else:
-                        currentPosition.append(lastPosition)
                 
-                self.motorsPosition = currentPosition
+                self.motorsPosition = self.updateCurrentMotorsPosition()
 
-            baseUzNewPosition = req.base_rotation_increment + self.motorsCurrentPosition[0]
-            allMotorsNewPosition = [baseUzNewPosition] + self.motorsPosition[1:]
+            allMotorsNewPosition = self.baseIncrementAlgorithm(msg.base_rotation_increment)
 
             if rospy.get_param('/movement_core/wait4u2d2'):
                 self.queue.append(allMotorsNewPosition)
 
             if PUB2VIS:
-                a = 1
-                b = -2*r*np.cos(allMotorsNewPosition[-1])
-                c = r**2 - L**2
 
-                delta = b**2 - 4*a*c
+                slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
 
-                angle2slide = (-b+np.sqrt(delta))/(2*a)
-
-                pub2VisPos = allMotorsNewPosition[:-1] + [angle2slide,angle2slide]
+                pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
                 self.queuevis.append(pub2VisPos)
-
-            response = base_rotationResponse()
-            response.success = True
 
             self.lastRequest = 'base_rotation'
-            self.lastIncrement = req.base_rotation_increment 
+            self.lastIncrement = msg.base_rotation_increment 
 
-        elif 'gripper_gap' in str(req.__class__):
+        elif 'gripper_gap' in str(msg.__class__):
             
             if self.lastRequest != 'gripper_gap':
-                currentPosition = []
-                for index, lastPosition in enumerate(self.motorsPosition):
-                    if abs(lastPosition-self.motorsCurrentPosition[index]) >= self.lastIncrement:
-                        currentPosition.append(self.motorsCurrentPosition[index])
-                    else:
-                        currentPosition.append(lastPosition)
-                
-                self.motorsPosition = currentPosition
 
-            gripperNewPosition = req.gripper_gap_increment + self.motorsCurrentPosition[-1]
-            allMotorsNewPosition = self.motorsPosition[:-1] + [gripperNewPosition] 
+                self.motorsPosition = self.updateCurrentMotorsPosition()
+
+            allMotorsNewPosition = self.gripperGapAlgorithm(msg.gripper_gap_increment)
 
             if rospy.get_param('/movement_core/wait4u2d2'):
                 self.queue.append(allMotorsNewPosition)
 
             if PUB2VIS:
-                a = 1
-                b = -2*r*np.cos(allMotorsNewPosition[-1])
-                c = r**2 - L**2
+                slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
 
-                delta = b**2 - 4*a*c
-
-                angle2slide = (-b+np.sqrt(delta))/(2*a)
-
-                pub2VisPos = allMotorsNewPosition[:-1] + [angle2slide,angle2slide]
+                pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
                 self.queuevis.append(pub2VisPos)
 
-            response = gripper_gapResponse()
-            response.success = True
-
             self.lastRequest = 'gripper_gap'
-            self.lastIncrement = req.gripper_gap_increment
+            self.lastIncrement = msg.gripper_gap_increment
         
-        elif 'SetBool' in str(req.__class__):
+        elif 'Bool' in str(msg.__class__):
             self.motorsPosition = [0, -0.8, -2, -1, 0, 0]
 
             allMotorsNewPosition = self.motorsPosition
@@ -178,24 +179,17 @@ class Core:
                 self.queue.append(allMotorsNewPosition)
 
             if PUB2VIS:
-                a = 1
-                b = -2*r*np.cos(allMotorsNewPosition[-1])
-                c = r**2 - L**2
+                slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
 
-                delta = b**2 - 4*a*c
-
-                angle2slide = (-b+np.sqrt(delta))/(2*a)
-
-                pub2VisPos = allMotorsNewPosition[:-1] + [angle2slide,angle2slide]
+                pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
                 self.queuevis.append(pub2VisPos)
-            
-            response = SetBoolResponse()
-            response.success = True
 
-            self.lastRequest = 'SetBool'
+            self.lastRequest = 'Bool'
             self.lastIncrement = 0
+        
+        elif 'kinematic_request' in str(msg.__class__):
 
-        return response 
+            
         
     def sendFromQueue(self, event):
         
@@ -213,7 +207,6 @@ class Core:
                 self.pub2vismsg.position = self.queuevis.pop(0)
                 self.pub2vismsg.header.stamp = rospy.Time.now()
                 self.pub2vis.publish(self.pub2vismsg)
-
 
 if __name__ == '__main__':
     np.set_printoptions(precision=3, suppress=True, linewidth=np.inf, threshold=sys.maxsize)
