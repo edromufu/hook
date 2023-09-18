@@ -71,9 +71,6 @@ def VirtuallyMoveJoints(indexes, dq, robot):
         
         if robot[j].get_id() == -1:
             qNew = 0
-        if robot[j].is_knee():
-            if qNew < -0.01:
-                qNew = 0
                 
         robot[j].jointRotation = qNew
     

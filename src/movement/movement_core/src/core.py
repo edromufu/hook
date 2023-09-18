@@ -10,6 +10,9 @@ hook_dir = '/home/'+os.getlogin()+'/hook/src/'
 sys.path.append(hook_dir+'movement/humanoid_definition/src')
 from setup_robot import Robot
 
+sys.path.append(hook_dir+'movement/kinematic_functions/src')
+from kinematic_request import moveGripper
+
 
 from movement_utils.srv import *
 from movement_utils.msg import *
@@ -20,7 +23,7 @@ QUEUE_TIME = rospy.get_param('/movement_core/queue_time') #Em segundos
 PUB2VIS = rospy.get_param('/movement_core/pub2vis')
 
 #Constantes relacionadas à transmissão da rotação do motor do gripper para sua translação
-L = 0.024 #Tamanho da manivela (m)
+L = 0.012 #Tamanho da manivela (m)
 r = 0.014 #Raio do motor (m)
 
 class Core:
@@ -77,44 +80,38 @@ class Core:
         self.callRobotModelUpdate()
 
     def callRobotModelUpdate(self):
-        self.motorsCurrentPosition = list(self.motorsFeedback(True).pos_vector)
+        self.motorsPosFeedback = list(self.motorsFeedback(True).pos_vector)
         
-        positions2Update = []
-        for element in self.motorsCurrentPosition:
-            positions2Update.append(element)
-
-        positions2Update = self.invertMotorsPosition(positions2Update)
-        
-        self.robotInstance.updateRobotModel([0] + positions2Update[1:4] + [0])
-    
-    def invertMotorsPosition(self, toInvert):
-        for index, joint in enumerate(self.robotModel):
-            if joint.is_inverted():
-                toInvert[joint.get_id()] *= -1
-        
-        return toInvert
+        self.robotInstance.updateRobotModel([0] + self.motorsPosition[1:4] + [0])
 
     def updateCurrentMotorsPosition(self):
         currentPosition = []
 
         for index, lastPosition in enumerate(self.motorsPosition):
-                if abs(lastPosition-self.motorsCurrentPosition[index]) >= self.lastIncrement:
-                    currentPosition.append(self.motorsCurrentPosition[index])
+                if abs(lastPosition-self.motorsPosFeedback[index]) >= self.lastIncrement:
+                    currentPosition.append(self.motorsPosFeedback[index])
                 else:
                     currentPosition.append(lastPosition)
         
         return currentPosition
 
     def baseIncrementAlgorithm(self, base_increment):
-        baseUzNewPosition = base_increment + self.motorsCurrentPosition[0]
+        baseUzNewPosition = base_increment + self.motorsPosFeedback[0]
 
         return [baseUzNewPosition] + self.motorsPosition[1:]
     
     def gripperGapAlgorithm(self, gripper_increment):
 
-        gripperNewPosition = gripper_increment + self.motorsCurrentPosition[-1]
+        gripperNewPosition = gripper_increment + self.motorsPosFeedback[-1]
 
         return self.motorsPosition[:-1] + [gripperNewPosition] 
+    
+    def kinematicAlgorithm(self, deltaX, deltaZ, deltaPitch):
+        [_, SHOULDER_UY, ELBOW_UY, WRIST_UY, _] = moveGripper(self.robotModel, deltaX, deltaZ, deltaPitch)
+
+        modeledMotorsPosition = [SHOULDER_UY, ELBOW_UY, WRIST_UY]
+
+        return [self.motorsPosition[0]] + modeledMotorsPosition + self.motorsPosition[-2:]
 
     def getSlideFromAngle(self, theta):
         b = -2*r*np.cos(theta)
@@ -127,6 +124,7 @@ class Core:
     def movementManager(self, msg):
         
         self.callRobotModelUpdate()
+        print(self.robotModel[-1].absolutePosition)
         self.enableTorque(True, [-1])
 
         if 'base_rotation' in str(msg.__class__):
@@ -171,7 +169,7 @@ class Core:
             self.lastIncrement = msg.gripper_gap_increment
         
         elif 'Bool' in str(msg.__class__):
-            self.motorsPosition = [0, -0.8, -2, -1, 0, 0]
+            self.motorsPosition = [0, -0.8, 1.5, 1.5, 0, 0]
 
             allMotorsNewPosition = self.motorsPosition
 
@@ -188,9 +186,25 @@ class Core:
             self.lastIncrement = 0
         
         elif 'kinematic_request' in str(msg.__class__):
-
             
-        
+            if self.lastRequest != 'kinematic_request':
+
+                self.motorsPosition = self.updateCurrentMotorsPosition()
+
+            allMotorsNewPosition = self.kinematicAlgorithm(msg.x_increment, msg.z_increment, msg.pitch_increment) 
+
+            if rospy.get_param('/movement_core/wait4u2d2'):
+                self.queue.append(allMotorsNewPosition)
+
+            if PUB2VIS:
+                slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
+
+                pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
+                self.queuevis.append(pub2VisPos)
+            
+            self.lastRequest = 'kinematic_request'
+            self.lastIncrement = 0
+
     def sendFromQueue(self, event):
         
         if rospy.get_param('/movement_core/wait4u2d2'):

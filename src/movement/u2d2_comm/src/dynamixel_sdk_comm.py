@@ -86,10 +86,9 @@ class u2d2Control():
                 motor_position, comm, hard = self.packetHandler.read2ByteTxRx(self.portHandler, motor_id, PROTOCOL_1_INFOS['PRES_POS_ADDR'])
 
                 if comm !=0 or hard != 0:
-                    self.feedbackRes.pos_vector[motor_id] = -1
+                    raise Exception(f'Erro de comunicação ou hardware no motor {motor_id}, refazendo.')
                 else:
                     self.feedbackRes.pos_vector[motor_id] = self.pos2rad(motor_position)
-
             return self.feedbackRes
 
         except Exception as e:
