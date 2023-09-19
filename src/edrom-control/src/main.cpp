@@ -2,11 +2,11 @@
 
 #define VRX1 36
 #define VRY1 39
-#define SW1 34
+#define SW1 32
 
 #define VRX2 33
 #define VRY2 25
-#define SW2 23
+#define SW2 26
 
 #define LED 2
 
@@ -19,7 +19,7 @@ float mapf(float x, float in_min, float in_max, float out_min, float out_max) {
 void printIfChanged(const char *flag, int previous, int current) {
     if (previous != current) {
         Serial.print(flag);
-        Serial.print("=");
+        Serial.print(" ");
         Serial.println(current);
     }
 }
@@ -28,20 +28,19 @@ class Joystick {
 private:
     int currentX, previousX, currentY, previousY, currentButton, previousButton;
     int xPort, yPort, bPort;
-    const char *name;
+    std::string name;
 
 public:
-    Joystick(int valXport, int valYport, int valBport, const char *valName);
+    Joystick(int valXport, int valYport, int valBport, const std::string& joystickName);
     void start();
     void read();
     void print();
 };
 
-Joystick::Joystick(int valXport, int valYport, int valBport, const char *valName) {
-    xPort = valXport;
-    yPort = valYport;
-    bPort = valBport;
-    name = valName;
+Joystick::Joystick(int valXport, int valYport, int valBport, const std::string& joystickName):xPort(valXport), yPort(valYport), bPort(valBport), name(joystickName) {
+    pinMode(xPort, INPUT);
+	pinMode(yPort, INPUT);
+	pinMode(bPort, INPUT_PULLUP);
 }
 
 void Joystick::start() {
@@ -58,15 +57,15 @@ void Joystick::read() {
 
     currentX = mapf(analogRead(xPort), 0, MAXINPUT, -5, 5);
     currentY = mapf(analogRead(yPort), 0, MAXINPUT, -5, 5);
-    currentButton = digitalRead(bPort);
+    currentButton = !digitalRead(bPort);
 
-    printIfChanged(name, previousX, currentX);
-    printIfChanged(name, previousY, currentY);
-    printIfChanged(name, previousButton, currentButton);
+    printIfChanged((name + "X").c_str(), previousX, currentX);
+    printIfChanged((name + "Y").c_str(), previousY, currentY);
+    printIfChanged((name + "B").c_str(), previousButton, currentButton);
 }
 
 void Joystick::print() {
-    Serial.print(name);
+    Serial.print(name.c_str());
     Serial.print(" X: ");
     Serial.print(currentX);
     Serial.print(" Y: ");
@@ -89,15 +88,10 @@ void setup() {
 }
 
 void loop() {
-    if (printLeft) {
-        left.read();
-        //left.print();
-    } else {
-        right.read();
-        //right.print();
-    }
-    
-    printLeft = !printLeft;
-    
-    delay(100);
+    left.read();
+    //left.print();
+    right.read();
+    //right.print();
+      
+    //delay(100);
 }

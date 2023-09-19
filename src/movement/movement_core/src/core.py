@@ -7,12 +7,8 @@ import numpy as np
 import sys, os
 hook_dir = '/home/'+os.getlogin()+'/hook/src/'
 
-sys.path.append(hook_dir+'movement/humanoid_definition/src')
-from setup_robot import Robot
-
 sys.path.append(hook_dir+'movement/kinematic_functions/src')
-from kinematic_request import moveGripper
-
+from ik_analytical import callIK
 
 from movement_utils.srv import *
 from movement_utils.msg import *
@@ -58,8 +54,6 @@ class Core:
         #Inicialização do objeto (modelo) da robô em código
         robot_name = rospy.get_param('/movement_core/name')
                 
-        self.robotInstance = Robot(robot_name)
-        self.robotModel = self.robotInstance.robotJoints
         self.lastRequest = None
         self.lastIncrement = 0
         self.motorsPosition = [0]*6
@@ -77,14 +71,10 @@ class Core:
         rospy.Timer(rospy.Duration(QUEUE_TIME), self.sendFromQueue)
 
         self.enableTorque(True, [-1])
-        self.callRobotModelUpdate()
-
-    def callRobotModelUpdate(self):
-        self.motorsPosFeedback = list(self.motorsFeedback(True).pos_vector)
-        
-        self.robotInstance.updateRobotModel([0] + self.motorsPosition[1:4] + [0])
 
     def updateCurrentMotorsPosition(self):
+        self.motorsPosFeedback = list(self.motorsFeedback(True).pos_vector)
+
         currentPosition = []
 
         for index, lastPosition in enumerate(self.motorsPosition):
@@ -105,13 +95,13 @@ class Core:
         gripperNewPosition = gripper_increment + self.motorsPosFeedback[-1]
 
         return self.motorsPosition[:-1] + [gripperNewPosition] 
-    
-    def kinematicAlgorithm(self, deltaX, deltaZ, deltaPitch):
-        [_, SHOULDER_UY, ELBOW_UY, WRIST_UY, _] = moveGripper(self.robotModel, deltaX, deltaZ, deltaPitch)
 
-        modeledMotorsPosition = [SHOULDER_UY, ELBOW_UY, WRIST_UY]
+    def kinematicAlgorithm(self, ikMotorsPosition, deltaX, deltaZ, deltaPitch):
+        ikOutput = callIK(ikMotorsPosition, deltaX, deltaZ, deltaPitch)
 
-        return [self.motorsPosition[0]] + modeledMotorsPosition + self.motorsPosition[-2:]
+        self.motorsPosition = [self.motorsPosition[0]] + ikOutput + self.motorsPosition[4:]
+
+        return self.motorsPosition
 
     def getSlideFromAngle(self, theta):
         b = -2*r*np.cos(theta)
@@ -123,8 +113,6 @@ class Core:
 
     def movementManager(self, msg):
         
-        self.callRobotModelUpdate()
-        print(self.robotModel[-1].absolutePosition)
         self.enableTorque(True, [-1])
 
         if 'base_rotation' in str(msg.__class__):
@@ -191,7 +179,7 @@ class Core:
 
                 self.motorsPosition = self.updateCurrentMotorsPosition()
 
-            allMotorsNewPosition = self.kinematicAlgorithm(msg.x_increment, msg.z_increment, msg.pitch_increment) 
+            allMotorsNewPosition = self.kinematicAlgorithm(self.motorsPosition[1:4], msg.x_increment, msg.z_increment, msg.pitch_increment) 
 
             if rospy.get_param('/movement_core/wait4u2d2'):
                 self.queue.append(allMotorsNewPosition)
