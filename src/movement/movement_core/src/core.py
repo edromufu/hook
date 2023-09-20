@@ -17,6 +17,7 @@ from sensor_msgs.msg import JointState
 
 QUEUE_TIME = rospy.get_param('/movement_core/queue_time') #Em segundos
 PUB2VIS = rospy.get_param('/movement_core/pub2vis')
+FP = rospy.get_param('/movement_core/first_pose')
 
 #Constantes relacionadas à transmissão da rotação do motor do gripper para sua translação
 L = 0.012 #Tamanho da manivela (m)
@@ -46,14 +47,7 @@ class Core:
             self.queue = []  
 
         # Inicialização das variáveis do ROS de requisição na core
-        rospy.Subscriber('movement_central/request_base_rotation', base_rotation, self.movementManager)
-        rospy.Subscriber('movement_central/request_gripper_gap', gripper_gap, self.movementManager)
-        rospy.Subscriber('movement_central/request_endeffector_kinematics', kinematic_request, self.movementManager)
-        rospy.Subscriber('movement_central/request_first_pose', Bool, self.movementManager)
-        rospy.Subscriber('movement_central/request_wrist_rotation', wrist_rotation, self.movementManager)
-
-        #Inicialização do objeto (modelo) da robô em código
-        robot_name = rospy.get_param('/movement_core/name')
+        rospy.Subscriber('movement_central/general_request', core, self.movementManager)
                 
         self.lastRequest = None
         self.lastIncrement = 0
@@ -72,6 +66,21 @@ class Core:
         rospy.Timer(rospy.Duration(QUEUE_TIME), self.sendFromQueue)
 
         self.enableTorque(True, [-1])
+        if FP:
+            self.callFP()
+
+    def callFP(self):
+        self.motorsPosition = [0, -0.8, 1.5, 1.5, 0, 0]
+        allMotorsNewPosition = self.motorsPosition
+
+        if rospy.get_param('/movement_core/wait4u2d2'):
+            self.queue.append(allMotorsNewPosition)
+
+        if PUB2VIS:
+            slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
+
+            pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
+            self.queuevis.append(pub2VisPos)
 
     def updateCurrentMotorsPosition(self):
         self.motorsPosFeedback = list(self.motorsFeedback(True).pos_vector)
@@ -120,109 +129,103 @@ class Core:
         return (-b+np.sqrt(delta))/2
 
     def movementManager(self, msg):
-        
-        self.enableTorque(True, [-1])
-        self.motorsPosFeedback = list(self.motorsFeedback(True).pos_vector)
-
-        if 'base_rotation' in str(msg.__class__):
+        try:
+            request = np.array([msg.wrist_increment, msg.x_increment, msg.z_increment, msg.pitch_increment, msg.gripper_gap_increment, msg.base_rotation_increment])
             
-            if self.lastRequest != 'base_rotation':
+            if np.sum(request) != 0:
+                self.enableTorque(True, [-1])
+                self.motorsPosFeedback = list(self.motorsFeedback(True).pos_vector)
                 
-                self.motorsPosition = self.updateCurrentMotorsPosition()
+                index = np.argmax(np.abs(request))
 
-            allMotorsNewPosition = self.baseIncrementAlgorithm(msg.base_rotation_increment)
+                # base_rotation
+                if index == 5:
+                    
+                    if self.lastRequest != 'base_rotation':
+                        
+                        self.motorsPosition = self.updateCurrentMotorsPosition()
 
-            if rospy.get_param('/movement_core/wait4u2d2'):
-                self.queue.append(allMotorsNewPosition)
+                    allMotorsNewPosition = self.baseIncrementAlgorithm(msg.base_rotation_increment)
 
-            if PUB2VIS:
+                    if rospy.get_param('/movement_core/wait4u2d2'):
+                        self.queue.append(allMotorsNewPosition)
 
-                slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
+                    if PUB2VIS:
 
-                pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
-                self.queuevis.append(pub2VisPos)
+                        slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
 
-            self.lastRequest = 'base_rotation'
-            self.lastIncrement = msg.base_rotation_increment 
+                        pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
+                        self.queuevis.append(pub2VisPos)
 
-        elif 'gripper_gap' in str(msg.__class__):
-            
-            if self.lastRequest != 'gripper_gap':
+                    self.lastRequest = 'base_rotation'
+                    self.lastIncrement = msg.base_rotation_increment 
 
-                self.motorsPosition = self.updateCurrentMotorsPosition()
+                # gripper_gap
+                elif index == 4:
+                    
+                    if self.lastRequest != 'gripper_gap':
 
-            allMotorsNewPosition = self.gripperGapAlgorithm(msg.gripper_gap_increment)
+                        self.motorsPosition = self.updateCurrentMotorsPosition()
 
-            if rospy.get_param('/movement_core/wait4u2d2'):
-                self.queue.append(allMotorsNewPosition)
+                    allMotorsNewPosition = self.gripperGapAlgorithm(msg.gripper_gap_increment)
 
-            if PUB2VIS:
-                slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
+                    if rospy.get_param('/movement_core/wait4u2d2'):
+                        self.queue.append(allMotorsNewPosition)
 
-                pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
-                self.queuevis.append(pub2VisPos)
+                    if PUB2VIS:
+                        slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
 
-            self.lastRequest = 'gripper_gap'
-            self.lastIncrement = msg.gripper_gap_increment
-        
-        elif 'Bool' in str(msg.__class__):
-            self.motorsPosition = [0, -0.8, 1.5, 1.5, 0, 0]
+                        pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
+                        self.queuevis.append(pub2VisPos)
 
-            allMotorsNewPosition = self.motorsPosition
+                    self.lastRequest = 'gripper_gap'
+                    self.lastIncrement = msg.gripper_gap_increment
+                
+                # kinematic_request
+                elif index in [1,2,3]:
+                    
+                    if self.lastRequest != 'kinematic_request':
 
-            if rospy.get_param('/movement_core/wait4u2d2'):
-                self.queue.append(allMotorsNewPosition)
+                        self.motorsPosition = self.updateCurrentMotorsPosition()
 
-            if PUB2VIS:
-                slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
+                    allMotorsNewPosition = self.kinematicAlgorithm(self.motorsPosition[1:4], msg.x_increment, msg.z_increment, msg.pitch_increment) 
 
-                pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
-                self.queuevis.append(pub2VisPos)
+                    if rospy.get_param('/movement_core/wait4u2d2'):
+                        self.queue.append(allMotorsNewPosition)
 
-            self.lastRequest = 'Bool'
-            self.lastIncrement = 0
-        
-        elif 'wrist_rotation' in str(msg.__class__):
-            if self.lastRequest != 'wrist_rotation':
+                    if PUB2VIS:
+                        slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
 
-                self.motorsPosition = self.updateCurrentMotorsPosition()
+                        pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
+                        self.queuevis.append(pub2VisPos)
+                    
+                    self.lastRequest = 'kinematic_request'
+                    self.lastIncrement = 0
 
-            allMotorsNewPosition = self.wristRotationAlgorithm(msg.wrist_increment)
+                    self.updateAfterKinematics()
 
-            if rospy.get_param('/movement_core/wait4u2d2'):
-                self.queue.append(allMotorsNewPosition)
+                # wrist_rotation
+                elif index == 0:
+                    if self.lastRequest != 'wrist_rotation':
 
-            if PUB2VIS:
-                slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
+                        self.motorsPosition = self.updateCurrentMotorsPosition()
 
-                pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
-                self.queuevis.append(pub2VisPos)
+                    allMotorsNewPosition = self.wristRotationAlgorithm(msg.wrist_increment)
 
-            self.lastRequest = 'wrist_rotation'
-            self.lastIncrement = msg.wrist_increment
-        
-        elif 'kinematic_request' in str(msg.__class__):
-            
-            if self.lastRequest != 'kinematic_request':
+                    if rospy.get_param('/movement_core/wait4u2d2'):
+                        self.queue.append(allMotorsNewPosition)
 
-                self.motorsPosition = self.updateCurrentMotorsPosition()
+                    if PUB2VIS:
+                        slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
 
-            allMotorsNewPosition = self.kinematicAlgorithm(self.motorsPosition[1:4], msg.x_increment, msg.z_increment, msg.pitch_increment) 
+                        pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
+                        self.queuevis.append(pub2VisPos)
 
-            if rospy.get_param('/movement_core/wait4u2d2'):
-                self.queue.append(allMotorsNewPosition)
+                    self.lastRequest = 'wrist_rotation'
+                    self.lastIncrement = msg.wrist_increment   
+        except:
+            pass
 
-            if PUB2VIS:
-                slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
-
-                pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
-                self.queuevis.append(pub2VisPos)
-            
-            self.lastRequest = 'kinematic_request'
-            self.lastIncrement = 0
-
-            self.updateAfterKinematics()
-            
     def sendFromQueue(self, event):
         
         if rospy.get_param('/movement_core/wait4u2d2'):

@@ -3,15 +3,16 @@
     <arg name="u2d2_port" default="/dev/ttyUSB0"/>
     <arg name="robot_name" default="hook"/>
     <arg name="queue_time" default="0.15"/>
-    <arg name="visualization" default="true"/>
+    <arg name="visualization" default="false"/>
     <arg name="control_rviz" default="false"/>
+    <arg name="first_pose" default="false"/>
 
-    <!-- Inicialização do movimento de -->
+    <!-- Inicialização do movimento-->
     <node name="movement_core" pkg="movement_core" type="core.py" output="screen">
-        <param name="name" value="$(eval arg('robot_name'))" />
         <param name="queue_time" value="$(eval arg('queue_time'))" />
         <param name="pub2vis" value="$(eval arg('visualization'))" />
         <param name="wait4u2d2" value="$(eval arg('u2d2_connected'))" />
+        <param name="first_pose" value="$(eval arg('first_pose'))" />
     </node>
 
     <!-- Comunicação dos motores com U2D2  -->
@@ -26,4 +27,8 @@
         <arg name="gui" value="$(arg control_rviz)" />
     </include>
 
+    <!-- Comunicação do conector -->
+    <node name="controller" pkg="control_gun" type="controller_read.py" output="screen">
+    </node>
+    
 </launch>

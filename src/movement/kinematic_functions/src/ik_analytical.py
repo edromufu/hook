@@ -3,7 +3,7 @@ from numpy import pi
 
 m = 0.160
 n = 0.094
-q = 0.17935
+q = 0.05
 
 def angleConv(ang):
     ang = ang%(2*pi)
@@ -60,8 +60,7 @@ def callIK(ikMotorsPosition, dx, dz, dtheta):
     try:
         output = ik(x0+dx, z0+dz, theta+dtheta)
     except Exception as e:
-        print(e)
-        print('Retornando posição original')
+        print('Retornando posição original.')
         output = ikMotorsPosition
 
     return output

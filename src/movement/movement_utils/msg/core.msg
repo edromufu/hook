@@ -1,0 +1,6 @@
+float32 wrist_increment
+float32 x_increment
+float32 z_increment
+float32 pitch_increment
+float32 gripper_gap_increment
+float32 base_rotation_increment

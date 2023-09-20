@@ -22,6 +22,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
+  core.msg
   arm_motors_data.msg
   gripper_motor_data.msg
   base_rotation.msg

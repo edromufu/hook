@@ -10,7 +10,7 @@ BAUDRATE = 1000000
 
 DEVICENAME = rospy.get_param('u2d2/port')
 PROTOCOL_1_INFOS =  {'TORQUE_ADDR': 24, 'LED_ADDR': 25 , 'MOVING_SPEED_ADDR': 32, 'MOVING_SPEED_LEN': 2, 'PRES_POS_ADDR': 36, 'GOAL_POS_ADDR': 30, 'GOAL_POS_LEN': 2}
-MOVING_SPEED = [100]*6
+MOVING_SPEED = [200]*6
 
 class u2d2Control():
 
@@ -85,14 +85,14 @@ class u2d2Control():
             for motor_id in range(6):
                 motor_position, comm, hard = self.packetHandler.read2ByteTxRx(self.portHandler, motor_id, PROTOCOL_1_INFOS['PRES_POS_ADDR'])
 
-                if comm !=0 or hard != 0:
+                if comm != 0 or hard != 0:
                     raise Exception(f'Erro de comunicação ou hardware no motor {motor_id}, refazendo.')
                 else:
                     self.feedbackRes.pos_vector[motor_id] = self.pos2rad(motor_position)
             return self.feedbackRes
 
         except Exception as e:
-            print(e)
+            #print(e)
             return self.feedbackArmMotors(req)
 
     def data2arm(self, msg):
@@ -107,6 +107,7 @@ class u2d2Control():
 
             self.armGroup.addParam(motor_id, bytes_value)
 
+    
         self.armGroup.txPacket()
         self.armMovingSpeed.txPacket()
 
@@ -121,6 +122,7 @@ class u2d2Control():
 
         self.gripperGroup.addParam(5, bytes_value)
 
+        
         self.gripperGroup.txPacket()
     
     def rad2pos(self, pos_in_rad):
