@@ -50,6 +50,7 @@ class Core:
         rospy.Subscriber('movement_central/request_gripper_gap', gripper_gap, self.movementManager)
         rospy.Subscriber('movement_central/request_endeffector_kinematics', kinematic_request, self.movementManager)
         rospy.Subscriber('movement_central/request_first_pose', Bool, self.movementManager)
+        rospy.Subscriber('movement_central/request_wrist_rotation', wrist_rotation, self.movementManager)
 
         #Inicialização do objeto (modelo) da robô em código
         robot_name = rospy.get_param('/movement_core/name')
@@ -96,12 +97,19 @@ class Core:
 
         return self.motorsPosition[:-1] + [gripperNewPosition] 
 
+    def wristRotationAlgorithm(self, wrist_increment):
+        wristNewPosition = wrist_increment + self.motorsPosFeedback[4]
+
+        return self.motorsPosition[:4] + [wristNewPosition] + [self.motorsPosition[5]]
+
     def kinematicAlgorithm(self, ikMotorsPosition, deltaX, deltaZ, deltaPitch):
         ikOutput = callIK(ikMotorsPosition, deltaX, deltaZ, deltaPitch)
 
-        self.motorsPosition = [self.motorsPosition[0]] + ikOutput + self.motorsPosition[4:]
-
-        return self.motorsPosition
+        return [self.motorsPosition[0]] + ikOutput + self.motorsPosition[4:]
+    
+    def updateAfterKinematics(self):
+        self.motorsPosFeedback = list(self.motorsFeedback(True).pos_vector)
+        self.motorsPosition = [self.motorsPosition[0]] + self.motorsPosFeedback[1:4] + self.motorsPosition[4:]
 
     def getSlideFromAngle(self, theta):
         b = -2*r*np.cos(theta)
@@ -114,6 +122,7 @@ class Core:
     def movementManager(self, msg):
         
         self.enableTorque(True, [-1])
+        self.motorsPosFeedback = list(self.motorsFeedback(True).pos_vector)
 
         if 'base_rotation' in str(msg.__class__):
             
@@ -173,6 +182,25 @@ class Core:
             self.lastRequest = 'Bool'
             self.lastIncrement = 0
         
+        elif 'wrist_rotation' in str(msg.__class__):
+            if self.lastRequest != 'wrist_rotation':
+
+                self.motorsPosition = self.updateCurrentMotorsPosition()
+
+            allMotorsNewPosition = self.wristRotationAlgorithm(msg.wrist_increment)
+
+            if rospy.get_param('/movement_core/wait4u2d2'):
+                self.queue.append(allMotorsNewPosition)
+
+            if PUB2VIS:
+                slide = self.getSlideFromAngle(allMotorsNewPosition[-1])
+
+                pub2VisPos = allMotorsNewPosition[:-1] + [slide,slide]
+                self.queuevis.append(pub2VisPos)
+
+            self.lastRequest = 'wrist_rotation'
+            self.lastIncrement = msg.wrist_increment
+        
         elif 'kinematic_request' in str(msg.__class__):
             
             if self.lastRequest != 'kinematic_request':
@@ -193,6 +221,8 @@ class Core:
             self.lastRequest = 'kinematic_request'
             self.lastIncrement = 0
 
+            self.updateAfterKinematics()
+            
     def sendFromQueue(self, event):
         
         if rospy.get_param('/movement_core/wait4u2d2'):

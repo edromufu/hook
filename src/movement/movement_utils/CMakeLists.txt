@@ -27,6 +27,7 @@ add_message_files(
   base_rotation.msg
   gripper_gap.msg
   kinematic_request.msg
+  wrist_rotation.msg
   )
 
 ## Generate services in the 'srv' folder

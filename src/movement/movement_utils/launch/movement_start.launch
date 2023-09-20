@@ -2,7 +2,7 @@
     <arg name="u2d2_connected" default="true"/>
     <arg name="u2d2_port" default="/dev/ttyUSB0"/>
     <arg name="robot_name" default="hook"/>
-    <arg name="queue_time" default="0.2"/>
+    <arg name="queue_time" default="0.15"/>
     <arg name="visualization" default="true"/>
     <arg name="control_rviz" default="false"/>
 

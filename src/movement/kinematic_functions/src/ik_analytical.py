@@ -1,22 +1,25 @@
 import numpy as np
 from numpy import pi
 
+m = 0.160
+n = 0.094
+q = 0.17935
+
 def angleConv(ang):
-    if (ang >= 0 and ang <= pi/2):
-      return ang
-    else:
-      return ang - pi*2
+    ang = ang%(2*pi)
+
+    if (ang >= pi):
+        ang -= 2*pi
+
+    return ang
         
 def ik(x, z, theta):
-    m = 0.160
-    n = 0.094
-    q = 0.17935
-
+    
     x1 = x - q*np.cos(theta)
     z1 = z + q*np.sin(theta)
-    p = np.sqrt(x1*x1 + z1*z1)
+    p = np.sqrt(x1**2 + z1**2)
 
-    cosBeta = (p*p - m*m - n*n)/(2*m*n)
+    cosBeta = (p**2 - m**2 - n**2)/(2*m*n)
     beta = np.arccos(cosBeta)
     gama = pi - beta
     sinphi = n/p*np.sin(gama)
@@ -40,19 +43,25 @@ def fk(motorsPosition):
     beta = motorsPosition[1] #... do elbow
     theta = motorsPosition[2] #... do wrist
 
-    xm = shoulderPositionX + m * sin(alfa)
-    zm = shoulderPositionZ + m * cos(alfa)
-    xn = xm + n * sin(alfa + beta)
-    zn = zm + n * cos(alfa + beta)
-    xq = xn + q * sin(alfa + beta + theta)
-    zq = zn + q * cos(alfa + beta + theta)
+    xm = shoulderPositionX + m * np.sin(alfa)
+    zm = shoulderPositionZ + m * np.cos(alfa)
+    xn = xm + n * np.sin(alfa + beta)
+    zn = zm + n * np.cos(alfa + beta)
+    xq = xn + q * np.sin(alfa + beta + theta)
+    zq = zn + q * np.cos(alfa + beta + theta)
 
     return [xq, zq]
 
 def callIK(ikMotorsPosition, dx, dz, dtheta):
     [x0, z0] = fk(ikMotorsPosition)
 
-    theta = np.sum(ikMotorsPosition) + pi/2
-
-    return ik(x0+dx, z0+dz, theta+dtheta)
+    theta = np.sum(ikMotorsPosition) - (pi/2)
     
+    try:
+        output = ik(x0+dx, z0+dz, theta+dtheta)
+    except Exception as e:
+        print(e)
+        print('Retornando posição original')
+        output = ikMotorsPosition
+
+    return output

@@ -1,0 +1,96 @@
+/// FLAMENGO MAIOR DA AMÉRICA
+
+let x1,z1,theta;
+let m = 0.160
+let n = 0.094
+let q = 0.17935
+
+let slider, sliderX, sliderY;
+
+function ik (x, z, theta) {
+  x1 = x - q*cos(theta)
+  z1 = z + q*sin(theta) // verificar sinal
+  fill(0,0,0)
+  circle(x,-z,10)
+  fill(0,255,0)
+  circle(x1,-z1,10)
+  fill(0,0,0)
+  console.log('x1: ', x1, ' z1: ', z1)
+  p = sqrt(x1*x1 + z1*z1)
+  
+  let cosBeta = (p*p - m*m - n*n)/(2*m*n)
+  textSize(20)
+  let beta = acos(cosBeta)
+  let gama = PI - beta
+  let sinphi = n/p*sin(gama)
+  let phi = asin(sinphi)
+  // let delta = atan(z1/x1)
+  let delta = (x1>0) ? (atan(z1/x1)):(atan(z1/x1)+PI)
+  let alfa = PI/2 - phi - delta
+  let thetaL = PI/2 - (alfa + beta) + theta;
+  //theta = thetaL - PI/2 + alfa + beta
+  // let alfa = (x1>0) ? (PI/2 - phi - delta):(PI/2 - phi - delta-PI)
+  text("cos(beta): "+cosBeta,20,20)
+  text("sin(phi): "+ sinphi,20,2*20)
+  text("x1: "+ x1,20,3*20)
+  text("theta: "+theta*180/PI,20,4*20)
+  text("delta: "+delta*180/PI,20,5*20)
+  text("alfa: "+alfa*180/PI,20,6*20)
+  text("beta: "+beta*180/PI,20,7*20)
+  text("thetaL: "+thetaL*180/PI,20,8*20)
+  // let alfa = PI/2 - asin(n/p*sin(beta)) - atan(z1/x1)
+  
+  
+  // line(0,0,p*cos(delta), -p*sin(delta))
+  return [alfa, beta, thetaL]
+  
+}
+
+function drawIK (alfa, beta, theta) {
+  
+    let x0 = 0, y0 = 0;
+    let xm = x0 + m * sin(alfa);
+    let ym = y0 + m * cos(alfa)
+    let xn = xm + n * sin(alfa + beta);
+    let yn = ym + n * cos(alfa + beta)
+    let xq = xn + q * sin(alfa + beta + theta);
+    let yq = yn + q * cos(alfa + beta + theta);
+  
+  
+  circle(0,0,10)
+  stroke(255, 0, 0)
+  line(x0, -y0, xm, -ym)
+  stroke(0, 255, 0)
+  line(xm, -ym, xn, -yn)
+  stroke(0, 0, 255)
+  line(xn, -yn, xq, -yq)
+  noFill()
+  circle(xq,-yq, 50)
+}
+
+function setup() {
+  createCanvas(600, 1500);
+  slider = createSlider(-360, 0, 1);
+  slider.position(10, 10);
+  slider.style('width', '80px');
+  sliderX = createSlider(0, 360, 1);
+  sliderX.position(10, 30);
+  sliderX.style('width', '80px');
+  sliderY = createSlider(-100, 360, 1);
+  sliderY.position(10, 50);
+  sliderY.style('width', '80px');
+  
+}
+
+function draw() {
+  translate(300,300)
+  background(220);
+  x = 0.252//sliderX.value()
+  y = 0.099//sliderY.value()
+  theta = -5.65//slider.value()*PI/180
+  let result = ik (x,y, theta)
+  console.log('input: ', [x, y, theta])
+  console.log('result: ', result)
+  // drawIK(PI/4,PI/4,PI/4)
+  drawIK(result[0], result[1], result[2])
+}

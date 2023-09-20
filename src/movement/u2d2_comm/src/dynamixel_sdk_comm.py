@@ -10,7 +10,7 @@ BAUDRATE = 1000000
 
 DEVICENAME = rospy.get_param('u2d2/port')
 PROTOCOL_1_INFOS =  {'TORQUE_ADDR': 24, 'LED_ADDR': 25 , 'MOVING_SPEED_ADDR': 32, 'MOVING_SPEED_LEN': 2, 'PRES_POS_ADDR': 36, 'GOAL_POS_ADDR': 30, 'GOAL_POS_LEN': 2}
-MOVING_SPEED = [200]*6
+MOVING_SPEED = [100]*6
 
 class u2d2Control():
 
@@ -34,7 +34,7 @@ class u2d2Control():
         self.armGroup = GroupSyncWrite(self.portHandler, self.packetHandler, PROTOCOL_1_INFOS['GOAL_POS_ADDR'], PROTOCOL_1_INFOS['GOAL_POS_LEN'])
         self.armMovingSpeed = GroupSyncWrite(self.portHandler, self.packetHandler, PROTOCOL_1_INFOS['MOVING_SPEED_ADDR'], PROTOCOL_1_INFOS['MOVING_SPEED_LEN'])
         self.gripperGroup = GroupSyncWrite(self.portHandler, self.packetHandler, PROTOCOL_1_INFOS['GOAL_POS_ADDR'], PROTOCOL_1_INFOS['GOAL_POS_LEN'])
-
+            
         for motor_id in range(5):
             value = MOVING_SPEED[motor_id]
             bytes_value = value.to_bytes(2, byteorder='little')
